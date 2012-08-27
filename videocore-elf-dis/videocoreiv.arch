@@ -288,40 +288,62 @@
 #
 #00037e24: 1111000000000000: ... :f000 0ff8 0385 ; vector48 0x0, 0x3850ff8
 
-# TODO: vertical, ... ???
-#1111 0000 000i dddd 0000 0011 1000 aaaa uxxu uuu0 yyuu uuuu     "; vld H(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
-#1111 0000 100i dddd 0000 0011 1000 aaaa uxxu uuu0 yyuu uuuu     "; vst H(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
-#1111 1000 000i dddd 0000 0011 1000 aaaa uxxu uuu0 yyuu uuuu     "; vld HX(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
-#1111 1000 100i dddd 0000 0011 1000 aaaa uxxu uuu0 yyuu uuuu     "; vst HX(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
+# 48-bit vector insns: 1111 0xxx ...
+# Work in progress!!
+# Some things may be incorrect, particularly the vertical vs horizontal flag for each register arg.
 
-# ????
-#1111 0000 000i dddd 0000 0011 1000 aaaa uxxu uuu1 yyuu uuuu     "; vld V(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
-#1111 0000 100i dddd 0000 0011 1000 aaaa uxxu uuu1 yyuu uuuu     "; vst V(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
-#1111 1000 000i dddd 0000 0011 1000 aaaa uxxu uuu1 yyuu uuuu     "; vld VX(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
-#1111 1000 100i dddd 0000 0011 1000 aaaa uxxu uuu1 yyuu uuuu     "; vst VX(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
+#Load/store
+1111 00uu 0uu0 00uu uuuu uuuu uuuu usss uxxu dddd dduu uuuu     "; Vld H(%d{d}, %d{(x<<4)}), (r%i{s})"
+1111 00uu 0uu1 00uu uuuu uuuu uuuu usss uxxu dddd dduu uuuu     "; Vld H(%d{d}, %d{(x<<4)}), (r%i{s})++"
+1111 00uu 1uu0 00dd dddd uuuu uuuu usss uuuu uuuu uuxx uuuu     "; Vst H(%d{d}, %d{(x<<4)}), (r%i{s})"
+1111 00uu 1uu1 00dd dddd uuuu uuuu usss uuuu uuuu uuxx uuuu     "; Vst H(%d{d}, %d{(x<<4)}), (r%i{s})++"
 
-# TODO: vertical, ... ???
-# 8-bit args
-# The following is definitely NOT accurate - just an experiment!
-1111 0vvv vvvi dddd iiii iiii iiii aaaa uxxu uuu0 yyuu uuuu     "; v_48_%s{v} H(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
-1111 0vvv vvvi dddd iiii iiii iiii aaaa uxxu uuu1 yyuu uuuu     "; v_48_%s{v} V(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
+1111 00uu 0uu0 01uu uuuu uuuu uuuu usss uyyu dddd dduu uuuu     "; Vld V(%d{(y<<4)}, %d{d}), (r%i{s})"
+1111 00uu 0uu1 01uu uuuu uuuu uuuu usss uyyu dddd dduu uuuu     "; Vld V(%d{(y<<4)}, %d{d}), (r%i{s})++"
+1111 00uu 1uu0 01dd dddd uuuu uuuu usss uuuu uuuu uuyy uuuu     "; Vst V(%d{(y<<4)}, %d{d}), (r%i{s})"
+1111 00uu 1uu1 01dd dddd uuuu uuuu usss uuuu uuuu uuyy uuuu     "; Vst V(%d{(y<<4)}, %d{d}), (r%i{s})++"
 
-# 16-bit args - 80-bit??
-#1111 1iii iiii dddd iiii ivvv viii aaaa uxxu uuuu yyuu uuuu     "; v%s{v} H(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a})"
+1111 00uu 0uu0 10uu uuuu uuuu uuuu usss uxxu dddd dduu uuuu     "; Vld HX(%d{d}, %d{(x<<4)}), (r%i{s})"
+1111 00uu 0uu1 10uu uuuu uuuu uuuu usss uxxu dddd dduu uuuu     "; Vld HX(%d{d}, %d{(x<<4)}), (r%i{s})++"
+1111 00uu 1uu0 10dd dddd uuuu uuuu usss uuuu uuuu uuxx uuuu     "; Vst HX(%d{d}, %d{(x<<4)}), (r%i{s})"
+1111 00uu 1uu1 10dd dddd uuuu uuuu usss uuuu uuuu uuxx uuuu     "; Vst HX(%d{d}, %d{(x<<4)}), (r%i{s})++"
 
-#1111 1011 1110 0000 vvvv vvvv vvvv vvvv xxxx xxxx xxxx xxxx yyyy yyyy yyyy yyyy zzzz zzzz zzzz zzzz    "; UNK_VEC_80_1 0x%04x{v}, 0x%04x{x}, 0x%04x{y}, 0x%04x{z}"
-#1111 1uuu uuuu uuuu tttt tttt tttt tttt xxxx xxxx xxxx xxxx yyyy yyyy yyyy yyyy zzzz zzzz zzzz zzzz    "; UNK_VEC_80 0x%04x{u}, 0x%04x{t}, 0x%04x{x}, 0x%04x{y}, 0x%04x{z}"
+1111 00uu 0uu0 11uu uuuu uuuu uuuu usss uyyu dddd dduu uuuu     "; Vld VX(%d{(y<<4)}, %d{d}), (r%i{s})"
+1111 00uu 0uu1 11uu uuuu uuuu uuuu usss uyyu dddd dduu uuuu     "; Vld VX(%d{(y<<4)}, %d{d}), (r%i{s})++"
+1111 00uu 1uu0 11dd dddd uuuu uuuu usss uuuu uuuu uuyy uuuu     "; Vst VX(%d{(y<<4)}, %d{d}), (r%i{s})"
+1111 00uu 1uu1 11dd dddd uuuu uuuu usss uuuu uuuu uuyy uuuu     "; Vst VX(%d{(y<<4)}, %d{d}), (r%i{s})++"
 
-1111 1vvv vvvi dddd iiii iiii iiii aaaa uxxu uuu0 yyuu uuuu zzzz zzzz zzzz zzzz tttt tttt tttt tttt     "; v_80_%s{v} H(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a}), 0x%04x{z}, 0x%04x{t}"
-1111 1vvv vvvi dddd iiii iiii iiii aaaa uxxu uuu1 yyuu uuuu zzzz zzzz zzzz zzzz tttt tttt tttt tttt     "; v_80_%s{v} V(%d{(x<<4)|d}, %d{(y<<4)|d}), (r%i{a}), 0x%04x{z}, 0x%04x{t}"
+#Vector data ops
+#TODO - Vertical flag for A argument?? B as register?
+1111 01vv vvvv 00aa aaaa u0uu uuuu usss uxxu dddd ddbb uuuu     "; V%s{v} H(%d{d}, %d{(x<<4)}), H(%d{a}, %d{b<<4})"
+1111 01vv vvvv 01aa aaaa u0uu uuuu usss uyyu dddd ddbb uuuu     "; V%s{v} V(%d{(y<<4)}, %d{d}), H(%d{a}, %d{b<<4})"
+
+1111 01vv vvvv 00aa aaaa u1uu uuii iiii uxxu dddd ddbb uuuu     "; V%s{v} H(%d{d}, %d{(x<<4)}), H(%d{a}, %d{b<<4}), #%d{i}"
+1111 01vv vvvv 01aa aaaa u1uu uuii iiii uyyu dddd ddbb uuuu     "; V%s{v} V(%d{(y<<4)}, %d{d}), H(%d{a}, %d{b<<4}), #%d{i}"
+
+1111 01vv vvvv 10aa aaaa u0uu uuuu usss uxxu dddd ddbb uuuu     "; V%s{v} HX(%d{d}, %d{(x<<4)}), HX(%d{a}, %d{b<<4})"
+1111 01vv vvvv 11aa aaaa u0uu uuuu usss uyyu dddd ddbb uuuu     "; V%s{v} VX(%d{(y<<4)}, %d{d}), HX(%d{a}, %d{b<<4})"
+
+1111 01vv vvvv 10aa aaaa u1uu uuii iiii uxxu dddd ddbb uuuu     "; V%s{v} HX(%d{d}, %d{(x<<4)}), HX(%d{a}, %d{b<<4}), #%d{i}"
+1111 01vv vvvv 11aa aaaa u1uu uuii iiii uyyu dddd ddbb uuuu     "; V%s{v} VX(%d{(y<<4)}, %d{d}), HX(%d{a}, %d{b<<4}), #%d{i}"
+
+
+#80-bit vector insns: 1111 1xxx ...
+#TODO
+#OBSOLETE
+#format of the first 48 bits is very similar to 48-bit (above) and can be adapted.
+1111 1uuu 0uu0 dddd uuuu vvvv vvuu uuuu uxxu uuuu yyuu uuuu uuuu uuuu uuus ssuu uuuu uuuu uuuu uuuu     "; v_80_%s{v} H(%d{(y<<4)|d}, %d{(x<<4)|d}), (r%i{s})"
+1111 1uuu 0uu1 dddd uuuu vvvv vvuu uuuu uxxu uuuu yyuu uuuu uuuu uuuu uuus ssuu uuuu uuuu uuuu uuuu     "; v_80_%s{v} V(%d{(y<<4)|d}, %d{(x<<4)|d}), (r%i{s})"
+1111 1uuu 1uu0 dddd uuuu vvvv vvuu usss uxxu uuuu yyuu uuuu uuuu uuuu uuuu uuuu uuuu uuuu uuuu uuuu     "; v_80_%s{v} (r%i{s}), H(%d{(y<<4)|d}, %d{(x<<4)|d})"
+1111 1uuu 1uu1 dddd uuuu vvvv vvuu usss uxxu uuuu yyuu uuuu uuuu uuuu uuuu uuuu uuuu uuuu uuuu uuuu     "; v_80_%s{v} (r%i{s}), V(%d{(y<<4)|d}, %d{(x<<4)|d})"
 
 #
 # The rules below catch all undefined bit sequences.
 #
 
 #1111 1xxx xxxx xxxx yyyy yyyy yyyy yyyy yyyy yyyy yyyy yyyy zzzz zzzz zzzz zzzz zzzz zzzz zzzz zzzz    "; vector80 0x%x{x}, 0x%x{y}, 0x%x{z}"
-#1111 0xxx xxxx xxxx yyyy yyyy yyyy yyyy yyyy yyyy yyyy yyyy       "; vector48 0x%x{x}, 0x%x{y}"
-1111 xxxx xxxx xxxx yyyy yyyy yyyy yyyy yyyy yyyy yyyy yyyy       "; vector48 0x%x{x}, 0x%x{y}"
+1111 0xxx xxxx xxxx yyyy yyyy yyyy yyyy yyyy yyyy yyyy yyyy       "; vector48 0x%x{x}, 0x%x{y}"
+#1111 xxxx xxxx xxxx yyyy yyyy yyyy yyyy yyyy yyyy yyyy yyyy       "; vector48 0x%x{x}, 0x%x{y}"
 1110 xxxx xxxx xxxx yyyy yyyy yyyy yyyy yyyy yyyy yyyy yyyy       "; scalar48 0x%x{x}, 0x%x{y}"
 1xxx xxxx xxxx xxxx yyyy yyyy yyyy yyyy                           "; scalar32 0x%x{x}, 0x%x{y}"
 0xxx xxxx xxxx xxxx                                               "; scalar16 0x%x{x}"
