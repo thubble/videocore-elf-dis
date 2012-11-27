@@ -51,6 +51,24 @@ namespace videocoreelfdis
 		{
 			_filePath = filePath;
 		}
+		
+		private void ProcessNonELFRawBytecode()
+		{
+			_symEntries = new EntryInfo<SYMBOL_ENTRY>[0];
+			
+			var mainSI = new SectionInfo
+			{
+				SectionOffset = 0,
+				SectionType = SectionType.Text,
+				Bytes = new byte[_bytes.Length - 512],
+			};
+			//_bytes.CopyTo(mainSI.Bytes, 0);
+			Buffer.BlockCopy
+				(_bytes, 512, mainSI.Bytes, 0, mainSI.Bytes.Length);
+			
+			_textAndDataSections = new Dictionary<ushort, SectionInfo>(1);
+			_textAndDataSections.Add(1, mainSI);
+		}
 
 		public void Read()
 		{
@@ -59,14 +77,21 @@ namespace videocoreelfdis
 				_bytes = new byte[(int)fs.Length];
 				fs.Read(_bytes, 0, (int)fs.Length);
 			}
+			
+			if (_filePath.EndsWith("loader.bin") || _filePath.EndsWith("bootcode.bin") || _filePath.EndsWith("bootcode_new.bin"))
+			{
+				ProcessNonELFRawBytecode();
+			}
+			else
+			{
+				// do processing
+				ReadHeaders();
+				ReadOptionsSection();
+				ReadSymbolTable();
+				ReadTextAndDataSections();
+			}
 
-			// do processing
-			ReadHeaders();
-			ReadOptionsSection();
-			ReadSymbolTable();
-			ReadTextAndDataSections();
 			ProcessTextAndDataRelocations();
-
 
 			foreach (var kvp in _textAndDataSections)
 			{
@@ -230,7 +255,7 @@ namespace videocoreelfdis
 			sec.Name = "COMMON";
 			sec.Bytes = new byte[0];
 			sec.SectionType = SectionType.Data;
-
+			
 			ushort sectionIndex = 0xfff2;
 			_textAndDataSections[sectionIndex] = sec;
 		}
@@ -290,6 +315,16 @@ namespace videocoreelfdis
 			".text"
 		};
 
+		/*private static readonly string[] _textSections = new string[]
+		{
+			".init", ".fini", ".crypto", ".text"
+		};*/
+
+		/*private static readonly string[] _textSections = new string[]
+		{
+			".init", ".fini", ".crypto"
+		};*/
+
 		private static readonly string[] _dataSections = new string[]
 		{
 			".data", ".rodata", ".bss", ".got"
@@ -297,8 +332,8 @@ namespace videocoreelfdis
 
 		private void ProcessTextAndDataRelocations()
 		{
-			if (_symEntries == null)
-				return;
+			//if (_symEntries == null)
+			//	return;
 
 			foreach (var kvp in _textAndDataSections)
 			{

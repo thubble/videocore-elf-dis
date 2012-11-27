@@ -19,7 +19,7 @@ namespace videocoreelfdis
 
 		protected override void HandleInstruction(InstructionDefinition insn, byte[] bytes)
 		{
-			if (string.IsNullOrEmpty(insn.Callback))
+			if (insn.DefProcessorCallbackContext == null)
 				return;
 
 			var boundInsn = insn.Bind(bytes, _curIndex, _section);

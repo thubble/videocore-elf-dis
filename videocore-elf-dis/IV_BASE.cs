@@ -138,18 +138,29 @@ namespace videocoreelfdis
 			defLoc = _section.ObjectDefLocations.FirstOrDefault(kvp => kvp.Value == "vce_launch_h264_mbloop_download_h264_mbloop_invars_addr");
 			length = defLoc.Key - _section.SectionOffset;*/
 
-			while (i < length)
+			int j = 0;
+			while (i < (length - 1))
 			{
 				_curIndex = i;
 
 				var possibleBytes = GetPossibleInstructionBytes(machineCode, i);
 				byte[] insnBytes = null;
 
-				var insn = _instructions.First(x => x.IsMatch(possibleBytes, out insnBytes));
+				var insn = _instructions.FirstOrDefault(x => x.IsMatch(possibleBytes, out insnBytes));
+				if (insn == null)
+					break;
 
 				HandleInstruction(insn, insnBytes);
 
 				i += insn.ByteLength;
+				
+				j++;
+				if (j == 1000)
+				{
+					decimal pct = ((decimal)i / (decimal)length) * 100m;
+					Console.Out.WriteLine("{0}\t\t({1:#0.##}%)", i, pct);
+					j = 0;
+				}
 			}
 		}
 
@@ -168,25 +179,33 @@ namespace videocoreelfdis
 
 		private byte[][] GetPossibleInstructionBytes(byte[] a, int i)
 		{
-
 			var insns = new List<byte[]>
 			{
 				new byte[] {a[i+1], a[i+0]}
 			};
-
+			
 			var maxLength = a.Length - i;
 
 			if (maxLength >= 4)
 				insns.Add(new byte[] {a[i+1], a[i+0], a[i+3], a[i+2]});
 			if (maxLength >= 6)
-				insns.Add(new byte[] {a[i+1], a[i+0], a[i+5], a[i+4], a[i+3], a[i+2]});
+			{
+				if((a[i+1] & 0xF0) == 0xF0)
+					insns.Add(new byte[] {a[i+1], a[i+0], a[i+3], a[i+2], a[i+5], a[i+4]});
+				else
+					insns.Add(new byte[] {a[i+1], a[i+0], a[i+5], a[i+4], a[i+3], a[i+2]});
+			}
 			if (maxLength >= 8)
-				//insns.Add(new byte[] {a[i+1], a[i+0], a[i+7], a[i+6], a[i+5], a[i+4], a[i+3], a[i+2]});
-				insns.Add(new byte[] {a[i+1], a[i+0], a[i+5], a[i+4], a[i+3], a[i+2], a[i+7], a[i+6]});
+			{
+				if((a[i+1] & 0xF0) == 0xF0)
+					insns.Add(new byte[] {a[i+1], a[i+0], a[i+3], a[i+2], a[i+5], a[i+4], a[i+7], a[i+6]});
+				else
+					insns.Add(new byte[] {a[i+1], a[i+0], a[i+7], a[i+6], a[i+5], a[i+4], a[i+3], a[i+2]});
+			}
 			if (maxLength >= 10)
 				//insns.Add(new byte[] {a[i+1], a[i+0], a[i+9], a[i+8], a[i+7], a[i+6], a[i+5], a[i+4], a[i+3], a[i+2]});
-				insns.Add(new byte[] {a[i+1], a[i+0], a[i+5], a[i+4], a[i+3], a[i+2], a[i+9], a[i+8], a[i+7], a[i+6]});
-
+				insns.Add(new byte[] {a[i+1], a[i+0], a[i+3], a[i+2], a[i+5], a[i+4], a[i+7], a[i+6], a[i+9], a[i+8]});
+			
 			return insns.ToArray();
 		}
 	}
@@ -197,7 +216,8 @@ namespace videocoreelfdis
 		public string ByteFormat { get; private set; }
 		public int ByteLength { get; private set; }
 		public string Action { get; private set; }
-		public string Callback { get; private set; }
+		public string CallbackText { get; private set; }
+		public CallbackContext DefProcessorCallbackContext { get; private set; }
 
 		public string PrintFormat { get; private set; }
 		public object[] RequiredFormatParams { get; private set; }
@@ -213,7 +233,7 @@ namespace videocoreelfdis
 			this.ByteFormat = byteFormat;
 			this.ByteLength = byteFormat.Length / 8;
 			this.Action = action;
-			this.Callback = callback;
+			this.CallbackText = callback;
 
 			_matchBytes = new byte[this.ByteLength];
 			_matchMask = new byte[this.ByteLength];
@@ -236,7 +256,8 @@ namespace videocoreelfdis
 			}
 
 			InitializePrintFormat();
-			InitializeCallback();
+			if (this.CallbackText != null)
+				this.DefProcessorCallbackContext = new CallbackContext(this.CallbackText);
 		}
 
 		public bool IsMatch(byte[][] possibleBytes, out byte[] actualBytes)
@@ -372,6 +393,19 @@ namespace videocoreelfdis
 
 					width = type = null;
 				}
+				else if (c == '[')
+				{
+					var fmt = Action.Substring(i);
+					int endBraceIndex = fmt.IndexOf(']');
+					fmt = fmt.Substring(1, endBraceIndex - 1);
+					i += endBraceIndex;
+
+					formatParams.Add(new CallbackContext(fmt));
+
+					sb.Append("{");
+					sb.Append(curFormatIndex++);
+					sb.Append("}");
+				}
 				else
 				{
 					sb.Append(c);
@@ -383,57 +417,6 @@ namespace videocoreelfdis
 			PrintFormat = sb.ToString();
 			RequiredFormatParams = formatParams.ToArray();
 		}
-
-		private void InitializeCallback()
-		{
-			if (string.IsNullOrEmpty(Callback))
-				return;
-
-			int beginParams = Callback.IndexOf('(');
-			CallbackFunctionName = Callback.Substring(0, beginParams).Trim();
-
-			var parmList = new List<object>();
-
-			var parmsString = Callback.Substring(beginParams + 1);
-			parmsString = parmsString.Substring(0, parmsString.LastIndexOf(')'));
-			foreach (var sParm in parmsString.Split(','))
-			{
-				var s = sParm.Trim();
-				var openBrace = s.IndexOf('{');
-				if (openBrace < 0)
-				{
-					parmList.Add(s);
-					continue;
-				}
-
-				var fmt = s.Substring(1, s.IndexOf('}') - 1);
-				fmt = fmt.Replace('$', 'A');
-				if (fmt.Length == 1)
-				{
-					// single character
-					parmList.Add(fmt[0]);
-				}
-				else
-				{
-					// formula expression
-					var expr = new Expression(fmt);
-					parmList.Add(expr);
-				}
-			}
-
-			RequiredCallbackParams = parmList.ToArray();
-		}
-
-		public MethodInfo GetCallbackMethod(object target)
-		{
-			if (_callbackMethod != null)
-				return _callbackMethod;
-			if (string.IsNullOrEmpty(CallbackFunctionName))
-				return null;
-			_callbackMethod = target.GetType().GetMethod(CallbackFunctionName);
-			return _callbackMethod;
-		}
-		private MethodInfo _callbackMethod = null;
 
 		public BoundInstruction Bind(byte[] bytes, int curOffset, SectionInfo section)
 		{
@@ -464,7 +447,7 @@ namespace videocoreelfdis
 			_pcRelBranchExpr = new Expression("A+o*2");
 		}
 
-		public string GetText()
+		public string GetText(object callbackTarget)
 		{
 			if (string.IsNullOrEmpty(Instruction.PrintFormat))
 				return string.Empty;
@@ -474,6 +457,13 @@ namespace videocoreelfdis
 			foreach (object p in Instruction.RequiredFormatParams)
 			{
 				i++;
+
+				var clbk = p as CallbackContext;
+				if (clbk != null)
+				{
+					evaluatedParams[i] = clbk.Invoke(callbackTarget, this, _boundValues);
+					continue;
+				}
 
 				var expr = p as Expression;
 				if (expr != null)
@@ -531,47 +521,8 @@ namespace videocoreelfdis
 
 		public void InvokeCallback(object target)
 		{
-			var funcRef = Instruction.GetCallbackMethod(target);
-			if (funcRef == null)
-				return;
-
-			var evaluatedParams = new object[Instruction.RequiredCallbackParams.Length + 1];
-			evaluatedParams[0] = this;
-			int i = 0;
-			foreach (object p in Instruction.RequiredCallbackParams)
-			{
-				i++;
-
-				var expr = p as Expression;
-				if (expr != null)
-				{
-					evaluatedParams[i] = EvaluateExpression(expr);
-					continue;
-				}
-
-				if (p is char)
-				{
-					var boundIndex = (char)p;
-
-					int boundValue;
-					if (_boundValues.TryGetValue(boundIndex, out boundValue))
-					{
-						string[] table;
-						if (IV_BASE._tables.TryGetValue(boundIndex, out table))
-							evaluatedParams[i] = table[boundValue];
-						else
-							evaluatedParams[i] = boundValue;
-
-						continue;
-					}
-
-					throw new Exception("INVALID CHARACTER");
-				}
-
-				throw new Exception("INVALID PRINT PARAMETER");
-			}
-
-			funcRef.Invoke(target, evaluatedParams);
+			if (Instruction.DefProcessorCallbackContext != null)
+				Instruction.DefProcessorCallbackContext.Invoke(target, this, _boundValues);
 		}
 
 		private void InitializeBoundData(byte[] bytes)
@@ -595,5 +546,126 @@ namespace videocoreelfdis
 				_boundLengths[boundIndex]++;
 			}
 		}
+	}
+
+	public class CallbackContext
+	{
+		public string CallbackText { get; private set; }
+		public string CallbackFunctionName { get; private set; }
+		public object[] RequiredParams { get; private set; }
+
+		public CallbackContext (string text)
+		{
+			CallbackText = text;
+			Initialize();
+		}
+
+		private void Initialize()
+		{
+			if (string.IsNullOrEmpty(CallbackText))
+				return;
+
+			int beginParams = CallbackText.IndexOf('(');
+			CallbackFunctionName = CallbackText.Substring(0, beginParams).Trim();
+
+			var parmList = new List<object>();
+
+			var parmsString = CallbackText.Substring(beginParams + 1);
+			parmsString = parmsString.Substring(0, parmsString.LastIndexOf(')'));
+			foreach (var sParm in parmsString.Split(','))
+			{
+				var s = sParm.Trim();
+				var openBrace = s.IndexOf('{');
+				if (openBrace < 0)
+				{
+					parmList.Add(s);
+					continue;
+				}
+
+				var fmt = s.Substring(1, s.IndexOf('}') - 1);
+				fmt = fmt.Replace('$', 'A');
+				if (fmt.Length == 1 && !(fmt[0] >= '0' && fmt[0] <= '9'))
+				{
+					// single character
+					parmList.Add(fmt[0]);
+				}
+				else
+				{
+					// formula expression
+					var expr = new Expression(fmt);
+					parmList.Add(expr);
+				}
+			}
+
+			RequiredParams = parmList.ToArray();
+		}
+
+		public string Invoke(object target, BoundInstruction source, Dictionary<char, int> boundValues)
+		{
+			var funcRef = GetCallbackMethod(target);
+			if (funcRef == null)
+				return string.Empty;
+
+			var evaluatedParams = new object[RequiredParams.Length + 1];
+			evaluatedParams[0] = source;
+			int i = 0;
+			foreach (object p in RequiredParams)
+			{
+				i++;
+
+				var expr = p as Expression;
+				if (expr != null)
+				{
+					evaluatedParams[i] = EvaluateExpression(expr, boundValues);
+					continue;
+				}
+
+				if (p is char)
+				{
+					var boundIndex = (char)p;
+
+					int boundValue;
+					if (boundValues.TryGetValue(boundIndex, out boundValue))
+					{
+						string[] table;
+						if (IV_BASE._tables.TryGetValue(boundIndex, out table))
+							evaluatedParams[i] = table[boundValue];
+						else
+							evaluatedParams[i] = boundValue;
+
+						continue;
+					}
+
+					throw new Exception("INVALID CHARACTER");
+				}
+
+				throw new Exception("INVALID PRINT PARAMETER");
+			}
+
+			var retVal = funcRef.Invoke(target, evaluatedParams);
+			return (retVal as string) ?? string.Empty;
+		}
+
+		private object EvaluateExpression(Expression expr, Dictionary<char, int> boundValues)
+		{
+			foreach (var bk in boundValues.Keys)
+			{
+				if (IV_BASE._tables.ContainsKey(bk))
+					continue;
+				expr.Parameters[bk.ToString()] = boundValues[bk];
+			}
+			return expr.Evaluate();
+		}
+
+		private MethodInfo GetCallbackMethod(object target)
+		{
+			if (_callbackMethod != null)
+				return _callbackMethod;
+			if (string.IsNullOrEmpty(CallbackFunctionName))
+				return null;
+			_callbackMethod = target.GetType().GetMethod(CallbackFunctionName);
+			return _callbackMethod;
+		}
+		private MethodInfo _callbackMethod = null;
 	}
 }
